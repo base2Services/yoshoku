@@ -15,7 +15,7 @@ natAMI:
 #end jenkins
 
 application_name: 'acmeorgsystems'
-no_spaces_client_name: 'acmeorgsystems;
+no_spaces_client_name: 'acmeorgsystems'
 
 include: database, cache
 
