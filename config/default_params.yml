@@ -1,0 +1,105 @@
+#cfndsl defaiult params
+
+application_name: 'acmeorgsystems'
+no_spaces_client_name: 'acmeorgsystems;
+
+include: database, cache
+
+source_bucket: source.aws.acmeorgsystems.com
+source_region: ap-southeast-2
+
+#aws_profile: acmeorgsystems
+
+#b2 monitoring peered network
+monitoringSubnet: 10.67.233.0/24
+
+#VPC/Network config
+
+#AWS Availability Zones Idenifers
+availability_zones:
+  - 'A'
+  - 'B'
+
+azId:
+  A: 0
+  B: 1
+
+vpc:
+  SubnetOctetA: "0"
+  SubnetOctetB: "1"
+app:
+  SubnetOctetA: "2"
+  SubnetOctetB: "3"
+postgresql:
+  SubnetOctetA: "4"
+  SubnetOctetB: "5"
+cache:
+  SubnetOctetA: "6"
+  SubnetOctetB: "7"
+activemq:
+  SubnetOctetA: "8"
+  SubnetOctetB: "9"
+
+#base2 Access
+opsAccess:
+  - 52.64.2.223/32
+  - 52.64.52.183/32
+  - 52.64.86.162/32
+  - 52.64.84.195/32
+  - 52.64.59.124/32
+  - 54.191.24.202/32
+  - 54.200.105.138/32
+devAccess:
+  - 8.8.8.8/32
+publicAccess:
+  - 0.0.0.0/0
+
+root_dns_domain: aws.acmeorgsystems.com
+
+#Environment config
+Mappings:
+  EnvironmentType:
+    production:
+      DnsDomainPrefix: aws.acmeorgsystems.com
+      KeyName: acmeorg-automation-shared
+      NatInstanceType: t2.small
+      AppInstanceType: m4.large
+      AMQInstanceType: t2.medium
+      WorkerInstanceType: c4.large
+      CacheInstanceType: cache.m3.medium
+      RDSInstanceType: db.t2.medium
+      RDSMasterUsername: acmeorgmaster
+      RDSMasterPassword: M@rm@l@de_15_Juicy
+      RDSMultiAZ: true
+      StackMask: 16
+      SubnetMask: 26
+      NetworkPrefix: 10
+      AppMinSize: 1
+      AppMaxSize: 1
+      AMQHA: false
+      AMQMinSize: 1
+      AMQMaxSize: 1
+      AppHealthCheckType: EC2
+      AMQHealthCheckType: EC2
+    dev:
+      DnsDomainPrefix: aws.acmeorgsystems.com
+      KeyName: acmeorg-automation-shared
+      NatInstanceType: t2.small
+      AppInstanceType: t2.large
+      AMQInstanceType: t2.medium
+      WorkerInstanceType: c4.large
+      CacheInstanceType: cache.m3.medium
+      RDSInstanceType: db.t2.medium
+      RDSMasterUsername: acmeorgmaster
+      RDSMasterPassword: Eat_The_peach_25x
+      RDSMultiAZ: false
+      StackMask: 16
+      SubnetMask: 26
+      NetworkPrefix: 10
+      AppMinSize: 1
+      AppMaxSize: 1
+      AMQHA: false
+      AMQMinSize: 1
+      AMQMaxSize: 1
+      AppHealthCheckType: EC2
+      AMQHealthCheckType: EC2
