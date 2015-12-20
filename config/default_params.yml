@@ -1,5 +1,19 @@
 #cfndsl defaiult params
 
+#jenkins will manage
+mqAMI:
+  ap-southeast-2:
+    ami: ami-xxx
+
+appAMI:
+  ap-southeast-2:
+    ami: ami-xxxx
+
+natAMI:
+  ap-southeast-2:
+    ami: ami-xxx
+#end jenkins
+
 application_name: 'acmeorgsystems'
 no_spaces_client_name: 'acmeorgsystems;
 
