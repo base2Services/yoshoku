@@ -1,0 +1,135 @@
+#!/usr/bin/env python
+# -*- coding: UTF-8 -*-
+
+import time
+import sys
+from boto.route53.connection import Route53Connection
+from boto.route53.exception import DNSServerError
+from boto.route53.record import ResourceRecordSets
+from boto.route53.zone import Zone
+from boto.route53.status import Status
+import os
+
+def __get_zone(conn, dns_domain_name):
+    zone = conn.get_hosted_zone_by_name(dns_domain_name)
+    return zone['GetHostedZoneResponse']['HostedZone']
+
+def _get_zone_ids(conn, dns_domain_name):
+    try:
+        zone = conn.get_hosted_zone_by_name(dns_domain_name)
+        if zone:
+            z = Zone(conn,zone['GetHostedZoneResponse']['HostedZone'])
+        else:
+            z = None
+        parent_zone = conn.get_hosted_zone_by_name(dns_domain_name.partition(".")[2])
+    except DNSServerError:
+        print "Zone Not Found"
+        sys.exit(1)
+    return (Zone(conn, parent_zone['GetHostedZoneResponse']['HostedZone']), z)
+
+def _get_ns_record(conn, dns_domain_name):
+    parent_zone, zone = _get_zone_ids(conn,dns_domain_name)
+    responses = parent_zone.find_records(dns_domain_name,'NS')
+    return responses
+
+def _add_ns_record(conn, parent_zone, zone, dns_name):
+    changes = ResourceRecordSets(conn, parent_zone.id)
+    change = changes.add_change("CREATE", dns_name, "NS")
+    for record in zone.get_nameservers():
+        change.add_value(record)
+    result = changes.commit()
+    return Status(conn,result['ChangeResourceRecordSetsResponse']['ChangeInfo'])
+
+def _del_ns_record(conn, parent_zone, dns_name):
+    record = parent_zone.find_records(dns_name,'NS')
+    result = parent_zone.delete_record(record)
+    return result
+
+def _has_ns_record(conn, dns_domain_name):
+    return _get_ns_record(conn, dns_domain_name) != None
+
+def has_ns_record(conn, dns_domain_name):
+    """Check for NS record from parent zone"""
+    if _has_ns_record(conn,dns_domain_name):
+        print "parent domain has NS record for " + dns_domain_name
+    else:
+        print "NS record for " + dns_domain_name + " not found is parent domain"
+
+def add_ns_record(conn, dns_domain_name):
+    """Add NS record from parent zone"""
+    if _has_ns_record(conn,dns_domain_name):
+        print "NS record for " + dns_domain_name + " already exists in parent zone please delete it first"
+        sys.exit(2)
+    else:
+        parent_zone, zone = _get_zone_ids(conn,dns_domain_name)
+        status =  _add_ns_record(conn,parent_zone,zone,dns_domain_name)
+        if status.status != 'PENDING' and status.status != 'INSYNC':
+            print "failed to add NS records for " + dns_domain_name
+            sys.exit(3)
+        else:
+            print "Successful added NS record for " + dns_domain_name
+
+def del_ns_record(conn, dns_domain_name):
+    """Delete NS record from parent zone"""
+    if _has_ns_record(conn,dns_domain_name):
+        parent_zone, zone = _get_zone_ids(conn,dns_domain_name)
+        status = _del_ns_record(conn,parent_zone,dns_domain_name)
+        if status.status != 'PENDING' and status.status != 'INSYNC':
+            print "failed to delete NS records for " + dns_domain_name
+            sys.exit(3)
+        else:
+            print "Successful deleted NS record for " + dns_domain_name
+    else:
+        print "NS record for " + dns_domain_name + " does not exists"
+
+def create_environment(conn, environment_name, environment_type, cf_version, environment_region = 'ap-southeast-2'):
+    """Creates an Full environment via Cloudformation"""
+
+
+
+def help(conn, fnc=None):
+    """Prints this help message"""
+    import inspect
+    self = sys.modules['__main__']
+    if fnc:
+        try:
+            cmd = getattr(self, fnc)
+        except:
+            cmd = None
+        if not inspect.isfunction(cmd):
+            print "No function named: %s found" % fnc
+            sys.exit(2)
+        (args, varargs, varkw, defaults) = inspect.getargspec(cmd)
+        print cmd.__doc__
+        print "Usage: %s %s" % (fnc, " ".join([ "[%s]" % a for a in args[1:]]))
+    else:
+        print "Usage: boss [command]"
+        for cname in dir(self):
+            if not cname.startswith("_"):
+                cmd = getattr(self, cname)
+                if inspect.isfunction(cmd):
+                    doc = cmd.__doc__
+                    print "\t%-20s  %s" % (cname, doc)
+    sys.exit(1)
+
+if __name__ == '__main__':
+    import boto
+    import sys
+    conn = boto.connect_route53()
+    self = sys.modules['__main__']
+    if len(sys.argv) >= 2:
+        try:
+            cmd = getattr(self, sys.argv[1])
+        except:
+            cmd = None
+        args = sys.argv[2:]
+    else:
+        cmd = help
+        args = []
+    if not cmd:
+        cmd = help
+    try:
+        cmd(conn, *args)
+    except TypeError, e:
+        print e
+        help(conn, cmd.__name__)
