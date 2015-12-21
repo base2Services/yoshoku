@@ -87,8 +87,8 @@ namespace :cfn do
 
   desc('creates an environment')
   task :create do
-    cmd = ['aws','cloudformation', 'create-stack', "--stack-name #{stack_name}", "--template-url https://s3-#{config['source_region']}.amazonaws.com/#{config['source_bucket']}/cloudformation/#{cf_version}/master.json", '--capabilities CAPABILITY_IAM']
-    cmd << "--parameters ParameterKey=EnvironmentName,ParameterValue=#{stack_name} ParameterKey=EnvironmentType,ParameterValue=#{environment_type} ParameterKey=ActiveMQEnabled,ParameterValue=#{enabled_activemq} ParameterKey=RDSSnapshotID,ParameterValue=#{rds_snapshot}, ParameterKey=StackOctet,ParameterValue=#{stack_octet}"
+    cmd = ['aws','cloudformation', 'create-stack', "--stack-name #{stack_name}", "--template-url https://#{config['source_bucket']}.s3.amazonaws.com/cloudformation/#{cf_version}/master.json", '--capabilities CAPABILITY_IAM']
+    cmd << "--parameters ParameterKey=EnvironmentName,ParameterValue=#{stack_name} ParameterKey=EnvironmentType,ParameterValue=#{environment_type} ParameterKey=StackOctet,ParameterValue=#{stack_octet}"
     config['aws_profile'].nil? ? '' : cmd << "--profile #{config['aws_profile']}"
     config['source_region'].nil? ? '' : cmd << "--region #{config['source_region']}"
     args = cmd.join(" ")
@@ -105,8 +105,8 @@ namespace :cfn do
 
   desc('updates the environment')
   task :update do
-    cmd = ['aws','cloudformation', 'update-stack', "--stack-name #{stack_name}", "--template-url https://s3-#{config['source_region']}.amazonaws.com/#{config['source_bucket']}/cloudformation/#{cf_version}/master.json", '--capabilities CAPABILITY_IAM']
-    cmd << "--parameters ParameterKey=EnvironmentName,ParameterValue=#{stack_name} ParameterKey=EnvironmentType,ParameterValue=#{environment_type} ParameterKey=ActiveMQEnabled,UsePreviousValue=true ParameterKey=RDSSnapshotID,UsePreviousValue=true ParameterKey=StackOctet,UsePreviousValue=true"
+    cmd = ['aws','cloudformation', 'update-stack', "--stack-name #{stack_name}", "--template-url https://#{config['source_bucket']}.s3.amazonaws.com/cloudformation/#{cf_version}/master.json", '--capabilities CAPABILITY_IAM']
+    cmd << "--parameters ParameterKey=EnvironmentName,ParameterValue=#{stack_name} ParameterKey=EnvironmentType,ParameterValue=#{environment_type} ParameterKey=StackOctet,UsePreviousValue=true"
     config['aws_profile'].nil? ? '' : cmd << "--profile #{config['aws_profile']}"
     config['source_region'].nil? ? '' : cmd << "--region #{config['source_region']}"
     args = cmd.join(" ")
@@ -146,11 +146,11 @@ namespace :cfn do
   def wait_for_cfn (config, stack_name)
     puts "waiting for cloudformation for environment - #{stack_name}"
     stacks = []
-    credentials = Aws::SharedCredentials.new(profile_name: 'acmeorgdev')
+    credentials = Aws::SharedCredentials.new(profile_name: "#{config['aws_profile']}")
     if File.exists?("#{ENV['HOME']}/.aws/credentials")
-      cfn = Aws::CloudFormation::Client.new(region: 'ap-southeast-2', credentials: credentials)
+      cfn = Aws::CloudFormation::Client.new(region: "#{config['source_region']}", credentials: credentials)
     else
-      cfn = Aws::CloudFormation::Client.new(region: 'ap-southeast-2')
+      cfn = Aws::CloudFormation::Client.new(region: "#{config['source_region']}")
     end
     # get master stack status
     success = false

@@ -27,7 +27,7 @@ CloudFormation do
 
   Parameter("StackOctet") {
     Type 'String'
-    Default '222'
+    Default '142'
   }
 
   Parameter("CertName") {
@@ -55,85 +55,93 @@ CloudFormation do
   end
   Resource("VPCStack") {
     Type 'AWS::CloudFormation::Stack'
-    Property('TemplateURL', "https://s3-#{source_region}.amazonaws.com/#{source_bucket}/cloudformation/#{cf_version}/vpc.json" )
+    Property('TemplateURL', "https://#{source_bucket}.s3.amazonaws.com/cloudformation/#{cf_version}/vpc.json" )
     Property('TimeoutInMinutes', 5)
     Property('Parameters', vpc_params )
   }
 
-  Resource("ElasticCacheStack") {
-    Type 'AWS::CloudFormation::Stack'
-    Property('TemplateURL', "https://s3-#{source_region}.amazonaws.com/#{source_bucket}/cloudformation/#{cf_version}/cache.json" )
-    Property('TimeoutInMinutes', 5)
-    Property('Parameters',{
-      EnvironmentType: Ref('EnvironmentType'),
-      EnvironmentName: Ref('EnvironmentName'),
-      VPC: FnGetAtt('VPCStack', 'Outputs.VPCId'),
-      StackOctet: FnGetAtt('VPCStack', 'Outputs.StackOctet'),
-      RouteTablePrivateA: FnGetAtt('VPCStack', 'Outputs.RouteTablePrivateA'),
-      RouteTablePrivateB: FnGetAtt('VPCStack', 'Outputs.RouteTablePrivateB'),
-      SecurityGroupBackplane: FnGetAtt('VPCStack', 'Outputs.SecurityGroupBackplane'),
-    })
-  }
+  if list_of_templates_to_include.include?("cache")
+    Resource("ElasticCacheStack") {
+      Type 'AWS::CloudFormation::Stack'
+      Property('TemplateURL', "https://#{source_bucket}.s3.amazonaws.com/cloudformation/#{cf_version}/cache.json" )
+      Property('TimeoutInMinutes', 5)
+      Property('Parameters',{
+        EnvironmentType: Ref('EnvironmentType'),
+        EnvironmentName: Ref('EnvironmentName'),
+        VPC: FnGetAtt('VPCStack', 'Outputs.VPCId'),
+        StackOctet: FnGetAtt('VPCStack', 'Outputs.StackOctet'),
+        RouteTablePrivateA: FnGetAtt('VPCStack', 'Outputs.RouteTablePrivateA'),
+        RouteTablePrivateB: FnGetAtt('VPCStack', 'Outputs.RouteTablePrivateB'),
+        SecurityGroupBackplane: FnGetAtt('VPCStack', 'Outputs.SecurityGroupBackplane'),
+      })
+    }
+  end
 
-  Resource("PostgreSQLStack") {
-    Type 'AWS::CloudFormation::Stack'
-    Property('TemplateURL', "https://s3-#{source_region}.amazonaws.com/#{source_bucket}/cloudformation/#{cf_version}/postgresql_rdb.json" )
-    Property('TimeoutInMinutes', 5)
-    Property('Parameters',{
-      EnvironmentType: Ref('EnvironmentType'),
-      EnvironmentName: Ref('EnvironmentName'),
-      VPC: FnGetAtt('VPCStack', 'Outputs.VPCId'),
-      StackOctet: FnGetAtt('VPCStack', 'Outputs.StackOctet'),
-      RouteTablePrivateA: FnGetAtt('VPCStack', 'Outputs.RouteTablePrivateA'),
-      RouteTablePrivateB: FnGetAtt('VPCStack', 'Outputs.RouteTablePrivateB'),
-      SubnetPublicA: FnGetAtt('VPCStack', 'Outputs.SubnetPublicA'),
-      SubnetPublicB: FnGetAtt('VPCStack', 'Outputs.SubnetPublicB'),
-      SecurityGroupBackplane: FnGetAtt('VPCStack', 'Outputs.SecurityGroupBackplane'),
-      SecurityGroupOps: FnGetAtt('VPCStack', 'Outputs.SecurityGroupOps'),
-      SecurityGroupDev: FnGetAtt('VPCStack', 'Outputs.SecurityGroupDev')
-    })
-  }
+  if list_of_templates_to_include.include?("postgresql_rdb")
+    Resource("PostgreSQLStack") {
+      Type 'AWS::CloudFormation::Stack'
+      Property('TemplateURL', "https://#{source_bucket}.s3.amazonaws.com/cloudformation/#{cf_version}/postgresql_rdb.json" )
+      Property('TimeoutInMinutes', 5)
+      Property('Parameters',{
+        EnvironmentType: Ref('EnvironmentType'),
+        EnvironmentName: Ref('EnvironmentName'),
+        VPC: FnGetAtt('VPCStack', 'Outputs.VPCId'),
+        StackOctet: FnGetAtt('VPCStack', 'Outputs.StackOctet'),
+        RouteTablePrivateA: FnGetAtt('VPCStack', 'Outputs.RouteTablePrivateA'),
+        RouteTablePrivateB: FnGetAtt('VPCStack', 'Outputs.RouteTablePrivateB'),
+        SubnetPublicA: FnGetAtt('VPCStack', 'Outputs.SubnetPublicA'),
+        SubnetPublicB: FnGetAtt('VPCStack', 'Outputs.SubnetPublicB'),
+        SecurityGroupBackplane: FnGetAtt('VPCStack', 'Outputs.SecurityGroupBackplane'),
+        SecurityGroupOps: FnGetAtt('VPCStack', 'Outputs.SecurityGroupOps'),
+        SecurityGroupDev: FnGetAtt('VPCStack', 'Outputs.SecurityGroupDev')
+      })
+    }
+  end
 
-  Resource("WebAppStack") {
-    Type 'AWS::CloudFormation::Stack'
-    DependsOn(['PostgreSQLStack','ElasticCacheStack'])
-    Property('TemplateURL', "https://s3-#{source_region}.amazonaws.com/#{source_bucket}/cloudformation/#{cf_version}/app.json" )
-    Property('TimeoutInMinutes', 5)
-    Property('Parameters',{
-      EnvironmentType: Ref('EnvironmentType'),
-      EnvironmentName: Ref('EnvironmentName'),
-      VPC: FnGetAtt('VPCStack', 'Outputs.VPCId'),
-      CertName: Ref('CertName'),
-      StackOctet: FnGetAtt('VPCStack', 'Outputs.StackOctet'),
-      RouteTablePrivateA: FnGetAtt('VPCStack', 'Outputs.RouteTablePrivateA'),
-      RouteTablePrivateB: FnGetAtt('VPCStack', 'Outputs.RouteTablePrivateB'),
-      SubnetPublicA: FnGetAtt('VPCStack', 'Outputs.SubnetPublicA'),
-      SubnetPublicB: FnGetAtt('VPCStack', 'Outputs.SubnetPublicB'),
-      SecurityGroupBackplane: FnGetAtt('VPCStack', 'Outputs.SecurityGroupBackplane'),
-      SecurityGroupOps: FnGetAtt('VPCStack', 'Outputs.SecurityGroupOps'),
-      SecurityGroupDev: FnGetAtt('VPCStack', 'Outputs.SecurityGroupDev')
-    })
-  }
+  if list_of_templates_to_include.include?("app")
+    Resource("WebAppStack") {
+      Type 'AWS::CloudFormation::Stack'
+      DependsOn(['PostgreSQLStack','ElasticCacheStack'])
+      Property('TemplateURL', "https://#{source_bucket}.s3.amazonaws.com/cloudformation/#{cf_version}/app.json" )
+      Property('TimeoutInMinutes', 5)
+      Property('Parameters',{
+        EnvironmentType: Ref('EnvironmentType'),
+        EnvironmentName: Ref('EnvironmentName'),
+        VPC: FnGetAtt('VPCStack', 'Outputs.VPCId'),
+        CertName: Ref('CertName'),
+        StackOctet: FnGetAtt('VPCStack', 'Outputs.StackOctet'),
+        RouteTablePrivateA: FnGetAtt('VPCStack', 'Outputs.RouteTablePrivateA'),
+        RouteTablePrivateB: FnGetAtt('VPCStack', 'Outputs.RouteTablePrivateB'),
+        SubnetPublicA: FnGetAtt('VPCStack', 'Outputs.SubnetPublicA'),
+        SubnetPublicB: FnGetAtt('VPCStack', 'Outputs.SubnetPublicB'),
+        SecurityGroupBackplane: FnGetAtt('VPCStack', 'Outputs.SecurityGroupBackplane'),
+        SecurityGroupOps: FnGetAtt('VPCStack', 'Outputs.SecurityGroupOps'),
+        SecurityGroupDev: FnGetAtt('VPCStack', 'Outputs.SecurityGroupDev')
+      })
+    }
+  end
 
-  Resource("ActiveMQStack") {
-    Type 'AWS::CloudFormation::Stack'
-    DependsOn(['PostgreSQLStack'])
-    Condition('ActiveMQEnabled')
-    Property('TemplateURL', "https://s3-#{source_region}.amazonaws.com/#{source_bucket}/cloudformation/#{cf_version}/activemq.json" )
-    Property('TimeoutInMinutes', 5)
-    Property('Parameters',{
-      EnvironmentType: Ref('EnvironmentType'),
-      EnvironmentName: Ref('EnvironmentName'),
-      VPC: FnGetAtt('VPCStack', 'Outputs.VPCId'),
-      StackOctet: FnGetAtt('VPCStack', 'Outputs.StackOctet'),
-      RouteTablePrivateA: FnGetAtt('VPCStack', 'Outputs.RouteTablePrivateA'),
-      RouteTablePrivateB: FnGetAtt('VPCStack', 'Outputs.RouteTablePrivateB'),
-      SubnetPublicA: FnGetAtt('VPCStack', 'Outputs.SubnetPublicA'),
-      SubnetPublicB: FnGetAtt('VPCStack', 'Outputs.SubnetPublicB'),
-      SecurityGroupBackplane: FnGetAtt('VPCStack', 'Outputs.SecurityGroupBackplane'),
-      SecurityGroupOps: FnGetAtt('VPCStack', 'Outputs.SecurityGroupOps'),
-      SecurityGroupDev: FnGetAtt('VPCStack', 'Outputs.SecurityGroupDev')
-    })
-  }
+  if list_of_templates_to_include.include?("activemq")
+    Resource("ActiveMQStack") {
+      Type 'AWS::CloudFormation::Stack'
+      DependsOn(['PostgreSQLStack'])
+      Condition('ActiveMQEnabled')
+      Property('TemplateURL', "https://#{source_bucket}.s3.amazonaws.com/cloudformation/#{cf_version}/activemq.json" )
+      Property('TimeoutInMinutes', 5)
+      Property('Parameters',{
+        EnvironmentType: Ref('EnvironmentType'),
+        EnvironmentName: Ref('EnvironmentName'),
+        VPC: FnGetAtt('VPCStack', 'Outputs.VPCId'),
+        StackOctet: FnGetAtt('VPCStack', 'Outputs.StackOctet'),
+        RouteTablePrivateA: FnGetAtt('VPCStack', 'Outputs.RouteTablePrivateA'),
+        RouteTablePrivateB: FnGetAtt('VPCStack', 'Outputs.RouteTablePrivateB'),
+        SubnetPublicA: FnGetAtt('VPCStack', 'Outputs.SubnetPublicA'),
+        SubnetPublicB: FnGetAtt('VPCStack', 'Outputs.SubnetPublicB'),
+        SecurityGroupBackplane: FnGetAtt('VPCStack', 'Outputs.SecurityGroupBackplane'),
+        SecurityGroupOps: FnGetAtt('VPCStack', 'Outputs.SecurityGroupOps'),
+        SecurityGroupDev: FnGetAtt('VPCStack', 'Outputs.SecurityGroupDev')
+      })
+    }
+  end
 
 end
