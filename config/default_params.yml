@@ -1,7 +1,13 @@
 #cfndsl defaiult params
 
+#Defines a list of templates that should be included in the build
+
+list_of_templates_to_include:
+  - app
+  - cache
+
 #jenkins will manage
-mqAMI:
+amqAMI:
   ap-southeast-2:
     ami: ami-xxx
 
