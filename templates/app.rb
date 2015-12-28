@@ -1,3 +1,4 @@
+require_relative "lib/standard"
 CloudFormation {
 
   # Template metadata
@@ -5,61 +6,49 @@ CloudFormation {
   Description "#{application_name} - Web App v#{cf_version}"
 
   # Parameters
-  Parameter("EnvironmentType"){ Type 'String' }
-  Parameter("EnvironmentName"){ Type 'String' }
-  Parameter("VPC"){ Type 'String' }
-  Parameter("StackOctet") { Type 'String' }
-  Parameter("RouteTablePrivateA"){ Type 'String' }
-  Parameter("RouteTablePrivateB"){ Type 'String' }
-  Parameter("SubnetPublicA"){ Type 'String' }
-  Parameter("SubnetPublicB"){ Type 'String' }
-  Parameter("SecurityGroupBackplane"){ Type 'String' }
-  Parameter("SecurityGroupOps"){ Type 'String' }
-  Parameter("SecurityGroupDev"){ Type 'String' }
-  Parameter("CertName"){ Type 'String' }
-
+  params = [
+    { :name => "EnvironmentType", :type =>  'String' },
+    { :name => "EnvironmentName", :type =>  'String' },
+    { :name => "VPC", :type =>  'String' },
+    { :name => "StackOctet", :type =>  'String' },
+    { :name => "RouteTablePrivateA", :type =>  'String' },
+    { :name => "RouteTablePrivateB", :type =>  'String' },
+    { :name => "SubnetPublicA", :type =>  'String' },
+    { :name => "SubnetPublicB", :type =>  'String' },
+    { :name => "SecurityGroupBackplane", :type =>  'String' },
+    { :name => "SecurityGroupOps", :type =>  'String' },
+    { :name => "SecurityGroupDev", :type =>  'String' },
+    { :name => "CertName", :type =>  'String' },
+    { :name => "RoleName", :type => 'String' }
+  ]
+  parameters(params)
 
   # Global mappings
-  Mapping('EnvironmentType', Mappings['EnvironmentType'])
-  Mapping('AppAMI', appAMI)
+  maps = [
+    { :name => 'EnvironmentType', :mapping => Mappings['EnvironmentType']},
+    { :name => 'AppAMI', :mapping => appAMI}
+  ]
+  do_mappings(maps)
 
+  azs = {}
   availability_zones.each do |az|
-    Resource("SubnetPrivate#{az}") {
-      Type 'AWS::EC2::Subnet'
-      Property('VpcId', Ref('VPC'))
-      Property('CidrBlock', FnJoin( "", [ FnFindInMap('EnvironmentType', Ref('EnvironmentType'),'NetworkPrefix'), ".", Ref('StackOctet'), ".", app["SubnetOctet#{az}"], ".0/24" ] ))
-      Property('AvailabilityZone', FnSelect(azId[az], FnGetAZs(Ref( "AWS::Region" )) ))
-      Property('Tags',[
-        {
-          Key: 'Name', Value: FnJoin( "", [ Ref('EnvironmentName'), "-app-private#{az}"])
-        }
-      ])
-    }
+    azs[az] = {:az_id => azId[az], :range => app["SubnetOctet#{az}"] }
   end
+  do_azs(azs)
 
-  rules = []
+  public_rules = []
   publicAccess.each do |ip|
-    rules << { IpProtocol: 'tcp', FromPort: '80', ToPort: '80', CidrIp: ip }
-    rules << { IpProtocol: 'tcp', FromPort: '443', ToPort: '443', CidrIp: ip }
+    public_rules << { IpProtocol: 'tcp', FromPort: '80', ToPort: '80', CidrIp: ip }
+    public_rules << { IpProtocol: 'tcp', FromPort: '443', ToPort: '443', CidrIp: ip }
   end
+  vpc_security_group("SecurityGroupPublic", 'Public Access', public_rules)
 
-  Resource("SecurityGroupPublic") {
-    Type 'AWS::EC2::SecurityGroup'
-    Property('VpcId', Ref('VPC'))
-    Property('GroupDescription', 'Public Access')
-    Property('SecurityGroupIngress', rules)
-  }
-
-  Resource("SecurityGroupPrivate") {
-    Type 'AWS::EC2::SecurityGroup'
-    Property('VpcId', Ref('VPC'))
-    Property('GroupDescription', 'ELB Access')
-    Property('SecurityGroupIngress', [
-      { 'IpProtocol' => 'tcp', 'FromPort' => '80', 'ToPort' => '80', 'CidrIp' => FnJoin( "", [ FnFindInMap('EnvironmentType', Ref('EnvironmentType'),'NetworkPrefix'), ".", Ref('StackOctet'), ".0.0/16" ] ) },
-      { 'IpProtocol' => 'tcp', 'FromPort' => '8080', 'ToPort' => '8080', 'CidrIp' => FnJoin( "", [ FnFindInMap('EnvironmentType', Ref('EnvironmentType'),'NetworkPrefix'), ".", Ref('StackOctet'), ".0.0/16" ] ) },
-      { 'IpProtocol' => 'tcp', 'FromPort' => '443', 'ToPort' => '443', 'CidrIp' => FnJoin( "", [ FnFindInMap('EnvironmentType', Ref('EnvironmentType'),'NetworkPrefix'), ".", Ref('StackOctet'), ".0.0/16" ] ) }
-    ])
-  }
+  private_rules =[
+    { 'IpProtocol' => 'tcp', 'FromPort' => '80', 'ToPort' => '80', 'CidrIp' => FnJoin( "", [ FnFindInMap('EnvironmentType', Ref('EnvironmentType'),'NetworkPrefix'), ".", Ref('StackOctet'), ".0.0/16" ] ) },
+    { 'IpProtocol' => 'tcp', 'FromPort' => '8080', 'ToPort' => '8080', 'CidrIp' => FnJoin( "", [ FnFindInMap('EnvironmentType', Ref('EnvironmentType'),'NetworkPrefix'), ".", Ref('StackOctet'), ".0.0/16" ] ) },
+    { 'IpProtocol' => 'tcp', 'FromPort' => '443', 'ToPort' => '443', 'CidrIp' => FnJoin( "", [ FnFindInMap('EnvironmentType', Ref('EnvironmentType'),'NetworkPrefix'), ".", Ref('StackOctet'), ".0.0/16" ] ) }
+  ]
+  vpc_security_group("SecurityGroupPrivate", 'ELB Access', private_rules)
 
   availability_zones.each do |az|
     Resource("SubnetRouteTableAssociationPrivate#{az}") {
@@ -234,41 +223,10 @@ CloudFormation {
     Property('Roles',[ Ref('Role') ])
   }
 
-  LaunchConfiguration( :LaunchConfig ) {
-    ImageId FnFindInMap('AppAMI',Ref('AWS::Region'),'ami')
-    IamInstanceProfile Ref('InstanceProfile')
-    KeyName FnFindInMap('EnvironmentType',Ref('EnvironmentType'),'KeyName')
-    SecurityGroups [ Ref('SecurityGroupBackplane'), Ref('SecurityGroupPrivate') ]
-    InstanceType FnFindInMap('EnvironmentType',Ref('EnvironmentType'),'AppInstanceType')
-    UserData FnBase64(FnJoin("",[
-      "#!/bin/bash\n",
-      "hostname ", Ref('EnvironmentName') ,"-appxx-`/opt/aws/bin/ec2-metadata --instance-id|/usr/bin/awk '{print $2}'`\n",
-      "sed '/HOSTNAME/d' /etc/sysconfig/network > /tmp/network && mv -f /tmp/network /etc/sysconfig/network && echo \"HOSTNAME=", Ref('EnvironmentName') ,"-appxx-`/opt/aws/bin/ec2-metadata --instance-id|/usr/bin/awk '{print $2}'`\" >>/etc/sysconfig/network && /etc/init.d/network restart\n",
-      "/opt/#{no_spaces_client_name}/ec2_bootstrap ", Ref("AWS::Region"), " ", Ref('AWS::AccountId'), "\n"
-    ]))
-  }
+  launch_configuration('AppAMI', ['SecurityGroupBackplane', 'SecurityGroupPrivate'], 'AppInstanceType', "/opt/#{no_spaces_client_name}/ec2_bootstrap" )
 
-  AutoScalingGroup("AutoScaleGroup") {
-    UpdatePolicy("AutoScalingRollingUpdate", {
-      "MinInstancesInService" => "0",
-      "MaxBatchSize"          => "1",
-    })
-    AvailabilityZones [
-      FnSelect('0',FnGetAZs(Ref('AWS::Region'))),
-      FnSelect('1',FnGetAZs(Ref('AWS::Region')))
-    ]
-    LaunchConfigurationName Ref('LaunchConfig')
-    LoadBalancerNames [ Ref('ElasticLoadBalancer') ]
-    HealthCheckGracePeriod '500'
-    HealthCheckType FnFindInMap('EnvironmentType',Ref('EnvironmentType'),'AppHealthCheckType')
-    MinSize FnFindInMap('EnvironmentType',Ref('EnvironmentType'),'AppMinSize')
-    MaxSize FnFindInMap('EnvironmentType',Ref('EnvironmentType'),'AppMaxSize')
-    VPCZoneIdentifier [ Ref('SubnetPrivateA'),Ref('SubnetPrivateB') ]
-    addTag("Name", FnJoin("",[Ref("EnvironmentName"),"-app-xx"]), true)
-    addTag("Environment", Ref("EnvironmentName"), true)
-    addTag("EnvironmentType", Ref("EnvironmentType"), true)
-    addTag("Role", "app", true)
-  }
+  auto_scaling_group("0", azs, 'LaunchConfig', 'ElasticLoadBalancer', 'AppHealthCheckType', 'AppMinSize', 'AppMinSize')
+
 
   Resource("ElasticLoadBalancer") {
     Type 'AWS::ElasticLoadBalancing::LoadBalancer'

@@ -101,7 +101,7 @@ CloudFormation do
   if list_of_templates_to_include.include?("app")
     Resource("WebAppStack") {
       Type 'AWS::CloudFormation::Stack'
-      DependsOn(['PostgreSQLStack','ElasticCacheStack'])
+      DependsOn(['ElasticCacheStack'])
       Property('TemplateURL', "https://#{source_bucket}.s3.amazonaws.com/cloudformation/#{cf_version}/app.json" )
       Property('TimeoutInMinutes', 5)
       Property('Parameters',{

@@ -12,7 +12,7 @@ namespace :cfn do
   #load config
   current_dir = File.dirname(File.expand_path(__FILE__))
   config = YAML.load(File.read("config/default_params.yml"))
-  templates = Dir["templates/**/*.rb"]
+  templates = Dir["templates/*.rb"]
   files = []
   templates.each do |template|
     filename = "#{template}"

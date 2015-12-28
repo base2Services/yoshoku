@@ -1,4 +1,5 @@
 require 'cfndsl'
+require_relative 'lib/vpc'
 
 CloudFormation {
 
